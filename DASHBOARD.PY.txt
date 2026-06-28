@@ -1,0 +1,56 @@
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def load_and_clean_data(filepath):
+    """
+    Ingests and preprocesses relational sheets from the verified source file.
+    """
+    print("[1/3] Loading multi-sheet workbook tables...")
+    xls = pd.ExcelFile(filepath)
+    df_orders = pd.read_excel(xls, sheet_name='Orders')
+    df_returns = pd.read_excel(xls, sheet_name='Returns')
+    df_users = pd.read_excel(xls, sheet_name='Users')
+    
+    print(f"Data ingested. Initial Fact Table shape: {df_orders.shape}")
+    
+    print("[2/3] Executing programmatic cleaning & formatting...")
+    df_orders.drop_duplicates(inplace=True)
+    
+    # Impute missing records inside product baseline metrics
+    df_orders['Product Base Margin'] = df_orders['Product Base Margin'].fillna(df_orders['Product Base Margin'].median())
+    
+    # Convert dates to true datetime objects
+    df_orders['Order Date'] = pd.to_datetime(df_orders['Order Date'])
+    df_orders['Ship Date'] = pd.to_datetime(df_orders['Ship Date'])
+    
+    return df_orders, df_returns, df_users
+
+def engineer_features(df_orders, df_returns):
+    """
+    Combines dimensional attributes and builds business analytics metrics.
+    """
+    print("[3/3] Joining tables and computing custom KPIs...")
+    df_merged = pd.merge(df_orders, df_returns, on='Order ID', how='left')
+    df_merged['Status'] = df_merged['Status'].fillna('Fulfilled')
+    
+    # Feature engineering formulas
+    df_merged['Profit_Margin_Pct'] = (df_merged['Profit'] / df_merged['Sales']) * 100
+    df_merged['Shipping_Latency_Days'] = (df_merged['Ship Date'] - df_merged['Order Date']).dt.days
+    
+    return df_merged
+
+if __name__ == "__main__":
+    # 1. Changed extension to .xlsx (since pandas expects an Excel workbook)
+    # 2. Added 'r' prefix to make it a raw string, fixing the \Users unicode error
+    # 3. Fixed the double-quote syntax error
+    target_file = r"C:\Users\LENOVO\OneDrive\เอกสาร\SECTION 1.xlsx"
+    
+    if os.path.exists(target_file):
+        orders, returns, users = load_and_clean_data(target_file)
+        final_analytics_model = engineer_features(orders, returns)
+        print("\nPipeline execution complete! Data model is fully ready for dashboard ingestion.")
+    else:
+        print(f"File Error: The file '{target_file}' was not found in the current folder path.")
